@@ -103,6 +103,231 @@ A Reactive Streams `Publisher` with rx operators that **emits 0 to N** elements,
 
 ### 3.3. Different operators for Mono and Flux
 
+#### Creating a Mono
+```
+Mono<String> result = Mono.just("alex").log ();
+```
+**Output:** `["alex"]`
+
+#### Mono FlatMap
+```
+Mono<List<String>> result = Mono.just("alex")
+  .flatMap(s -> (
+    var stringArray = s.split("");
+    return Mono.just(List.of(stringArray)) ;
+  })
+  .log() ;
+```
+**Output:** `List.of ("a", "l", "e", "x")`
+
+#### Mono FlatMapMany
+```
+Flux<String> result = Mono.just(("alex"))
+  .flatMapMany(s -> {
+    var strings = name.split("");
+    return Flux.fromArray(strings);
+  })
+  .log();
+```
+**Output:** `["a", "l", "e", "x"]`
+
+#### Mono Concat With
+```
+var aMono = Mono.just("A");
+var bMono = Mono.just("B");
+Flux<String> result = aMono.concatWith(bMono).log();
+```
+**Output:** `["A", "B"]`
+
+#### Mono Merge With
+```
+var aMono = Mono.just("A");
+var bMono = Mono.just("B");
+Flux<String> result = aMono.mergeWith(bMono).log();
+```
+**Output:** `["A", "B"]`
+
+#### Creating a Flux
+```
+List<String> INPUT_LIST = List.of("alex", "ben", "chloe");
+Flux<String> result = Flux.fromIterable(INPUT_LIST).log();
+```
+**Output:** `["alex", "ben", "chloe"]`
+
+#### Flux is Immutable
+```
+Flux<String> namesFlux = Flux.fromIterable(INPUT_LIST);
+namesFlux.map(String::toUpperCase);
+return namesFlux;
+```
+**Output:** `["alex", "ben", "chloe"]`
+
+#### Map operator
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .map(String::toUpperCase)
+  .log();
+```
+**Output:** `["ALEX", "BEN", "CHLOE"]`
+
+#### Filter operator
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST).map(String::toUpperCase)
+  .filter(name -> name.length() > 3)
+  .map(name -> name.length() + "-" + name)
+  .log();
+```
+**Output:** `["4-ALEX", "5-CHLOE"]`
+
+#### FlatMap
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .map(String::toUpperCase)
+  .filter(name -> name.length() > 3)
+  .flatMap(name -> {
+    var strings = name.split("");
+    var delay = rand.nextInt(1000);
+    return Flux.fromArray(strings)
+      .delayElements(Duration.ofMillis(delay));
+  })
+  .log();
+```
+**Output:** `["C", "H", "A", "L", "O", "E", "L", "E", "X"]`
+
+The sequence is not maintained
+
+#### ConcatMap
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .map(String::toUpperCase)
+  .filter(name -> name.length() > 3)
+  .concatMap(name -> {
+    var strings = name.split("");
+    var delay = rand.nextInt(1000);
+    return Flux.fromArray(strings)
+      .delayElements(Duration.ofMillis(delay));
+  })
+  .log();
+```
+**Output:** `["A", "L", "E", "X", "C", "H", "L", "O", "E"]`
+
+Sequence is maintained
+
+#### Transform
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .transform(filterFluxLength(3))
+  .log();
+
+// transform takes in a FunctionalInterface Function<T, R>
+// where <T> – the type of the input to the function
+// and <R> – the type of the result of the function
+
+Function<Flux<String>, Flux<String>> filterFluxLength(int stringLength) {
+  return name -> name.map(String::toUpperCase)
+    .filter(s -> s.length() > stringLength)
+    .flatMap(name -> {
+      var strings = name.split("");
+      return Flux.fromArray(strings);
+    });
+```
+**Output:** `["A", "L", "E", "X", "C", "H", "L", "O", "E"]`
+
+#### Default If Empty
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .transform(filterFluxLength(6))
+  .defaultIfEmpty("default")
+  .log();
+```
+**Output:** `["default"]`
+
+#### Switch If Empty
+```
+Flux<String> result = Flux.fromIterable(INPUT_LIST)
+  .transform(filterFluxLength(6))
+  .switchIfEmpty(Flux.just("default").transform(filterFluxLength(6)))
+  .log();
+```
+**Output:** `["D", "E", "F", "A", "U", "L", "T"]`
+
+This allows you to switch the flux input in case the first one returns an empty Flux.
+
+#### Concat
+```
+var abcFlux = Flux.just("A", "B", "C");
+var defFlux = Flux.just("D", "E", "F");
+Flux<String> result = Flux.concat(abcFlux, defFlux).log();
+```
+**Output:** `["A", "B", "C", "D", "E", "F"]`
+
+#### Concat With
+```
+var abcFlux = Flux.just("A", "B", "C");
+var defFlux = Flux.just("D", "E", "F");
+Flux<String> result = abcFlux.concatWith(defFlux).log();
+```
+**Output:** `["A", "B", "C", "D", "E", "F"]`
+
+#### Merge
+```
+var abcFlux = Flux.just("A", "B", "C")
+  .delayElements(Duration.ofMillis(100));
+var defFlux = Flux.just("D", "E", "F")
+  .delayElements(Duration.ofMillis(125));
+Flux<String> result = Flux.merge(abcFlux, defFlux).log();
+```
+**Output:** `["A", "D", "B", "E", "C", "F"]`
+
+#### Merge With
+```
+var abcFlux = Flux.just("A", "B", "C")
+  .delayElements(Duration.ofMillis(100));
+var defFlux = Flux.just("D", "E", "F")
+  .delayElements(Duration.ofMillis(125));
+Flux<String> result = abcFlux.mergeWith(defFlux).log();
+```
+**Output:** `["A", "D", "B", "E", "C", "F"]`
+
+#### Merge Sequential
+```
+var abcFlux = Flux.just("A", "B", "C")
+  .delayElements(Duration.ofMillis(100));
+var defFlux = Flux.just("D", "E", "F")
+  .delayElements(Duration.ofMillis(125));
+Flux<String> result = Flux.mergeSequential(abcFlux, defFlux).log();
+```
+**Output:** `["A", "B", "C", "D", "E", "F"]`
+
+#### Zip - using source1, source2 and BiFunction
+```
+var abcFlux = Flux.just("A", "B", "C");
+var defFlux = Flux.just("D", "E", "F");
+Flux<String> result = Flux.zip(abcFlux, defFlux, (first, second) -> first + second).log();
+```
+**Output:** `["AD", "BE", "CF"]`
+
+#### Zip - using 2 to 8 sources
+```
+var abcFlux = Flux.just("A", "B", "C");
+var defFlux = Flux.just("D", "E", "F");
+var num123Flux = Flux.just("1", "2", "3");
+var num456Flux = Flux.just("4", "5", "6");
+Flux<String> result = Flux.zip(abcFlux, defFlux, num123Flux, num456Flux)
+  .map(tuple4 -> tuple4.getT1() + tuple4.getT2() + tuple4.getT3() + tuple4.getT4())
+  .log();
+```
+**Output:** `["AD14", "BE25", "CF36"]`
+
+#### Zip With - using source1, source2 and BiFunction
+```
+var abcFlux = Flux.just("A", "B", "C");
+var defFlux = Flux.just("D", "E", "F");
+Flux<String> result = abcFlux.zipWith(defFlux, (first, second) -> first + second)
+  .log();
+```
+**Output:** `["AD", "BE", "CF"]`
+
 ## 4. Spring WebFlux
 
 > 📘 Official documentation for [Spring WebFlux](https://docs.spring.io/spring-framework/reference/web/webflux.html#webflux)
